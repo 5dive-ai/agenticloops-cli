@@ -16,36 +16,50 @@ function has(bin) {
   }
 }
 
-// Each harness: id, label, canSchedule, and a detect() that inspects cwd/env.
+// Each harness: id, label, canSchedule, headlessCmd (how it runs ONE prompt
+// non-interactively — the portable multi-agent backend shells this), and a
+// detect() that inspects cwd/env.
 export const HARNESSES = [
   {
     id: "5dive",
     label: "5dive runtime",
     canSchedule: true,
+    headlessCmd: ["claude", "-p"],
     detect: () => has("5dive") || existsSync("/var/lib/5dive"),
   },
   {
     id: "github-actions",
     label: "GitHub Actions",
     canSchedule: true,
+    headlessCmd: ["claude", "-p"],
     detect: (cwd) => existsSync(join(cwd, ".github", "workflows")) || !!process.env.GITHUB_ACTIONS,
   },
   {
     id: "claude-code",
     label: "Claude Code",
     canSchedule: false,
+    headlessCmd: ["claude", "-p"],
     detect: (cwd) => existsSync(join(cwd, ".claude")) || has("claude"),
+  },
+  {
+    id: "codex",
+    label: "Codex CLI",
+    canSchedule: false,
+    headlessCmd: ["codex", "exec"],
+    detect: (cwd) => existsSync(join(cwd, ".codex")) || has("codex"),
   },
   {
     id: "cursor",
     label: "Cursor",
     canSchedule: false,
+    headlessCmd: ["claude", "-p"], // no native headless; use claude if present
     detect: (cwd) => existsSync(join(cwd, ".cursor")),
   },
   {
     id: "cron",
     label: "system cron",
     canSchedule: true,
+    headlessCmd: ["claude", "-p"],
     detect: () => has("crontab"),
   },
 ];

@@ -2,6 +2,7 @@
 // agenticloops — install and run agentic loops (recurring AI agents in one
 // LOOP.md). One file defines it; any harness can run it. https://agenticloops.dev
 import { install } from "../src/install.mjs";
+import { runLoop } from "../src/runcmd.mjs";
 import { loadRegistry, search } from "../src/registry.mjs";
 import { listRecords, parseSchedule } from "../src/schedule.mjs";
 import { fetchInstalls } from "../src/telemetry.mjs";
@@ -25,6 +26,7 @@ const HELP = `${c.bold("agenticloops")} — install and run agentic loops ${c.di
 
 ${c.bold("Usage")}
   npx agenticloops install <owner/loop> [--harness=<id>] [--no-telemetry] [--yes] [--dry-run]
+  npx agenticloops run <owner/loop|path> [--harness=<id>] [--backend=portable|5dive]
   npx agenticloops find <query>
   npx agenticloops list
   npx agenticloops update [<slug>]
@@ -32,6 +34,8 @@ ${c.bold("Usage")}
 ${c.bold("Commands")}
   install   Fetch + validate a LOOP.md, install its skills, pre-flight its
             requirements, and register the recurring job on your harness.
+  run       Execute a loop's chain once now (what a schedule fires). Multi-agent
+            loops run each role in order, threading {{previous_output}} forward.
   find      Search the public directory (agenticloops.dev) for loops.
   list      Show loops installed on this machine + their install counts.
   update    Re-fetch + re-install a loop (all, or one slug).
@@ -58,6 +62,17 @@ async function cmdInstall(positional, flags) {
     yes: !!flags.yes,
     dryRun: !!flags["dry-run"],
   });
+}
+
+async function cmdRun(positional, flags) {
+  const ref = positional[0];
+  if (!ref) throw new CliError("usage: agenticloops run <owner/loop|path>", 2);
+  const res = await runLoop(ref, {
+    harness: typeof flags.harness === "string" ? flags.harness : undefined,
+    backend: typeof flags.backend === "string" ? flags.backend : undefined,
+  });
+  if (flags.json) process.stdout.write(JSON.stringify(res.signed || res.receipt, null, 2) + "\n");
+  process.exitCode = res.ok ? 0 : 1;
 }
 
 async function cmdFind(positional) {
@@ -138,6 +153,8 @@ async function main() {
     case "install":
     case "add":
       return cmdInstall(positional, flags);
+    case "run":
+      return cmdRun(positional, flags);
     case "find":
     case "search":
       return cmdFind(positional, flags);

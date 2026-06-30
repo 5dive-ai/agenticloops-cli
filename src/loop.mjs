@@ -99,7 +99,50 @@ export function validateManifest(manifest) {
   if (m.skills && !Array.isArray(m.skills)) errs.push("`skills` must be a list");
   if (m.requires && typeof m.requires !== "object") errs.push("`requires` must be a mapping");
 
+  // Multi-agent (§ agents:) — an ordered chain of role-prompts. Additive: a loop
+  // with no `agents:` is the single-prompt body, unchanged.
+  if (m.agents !== undefined) {
+    if (!Array.isArray(m.agents) || m.agents.length === 0) {
+      errs.push("`agents` must be a non-empty list of roles");
+    } else {
+      const seen = new Set();
+      m.agents.forEach((a, i) => {
+        if (!a || typeof a !== "object") return errs.push(`agents[${i}] must be a mapping`);
+        if (!a.role || !/^[a-z0-9][a-z0-9-]*$/.test(a.role))
+          errs.push(`agents[${i}].role must be a kebab-case id`);
+        else if (seen.has(a.role)) errs.push(`duplicate role "${a.role}"`);
+        else seen.add(a.role);
+        if (!a.prompt || typeof a.prompt !== "string")
+          errs.push(`agents[${i}] (${a.role || i}) is missing a prompt`);
+        if (a.skills && !Array.isArray(a.skills))
+          errs.push(`agents[${i}].skills must be a list`);
+      });
+    }
+  }
+
   return errs;
+}
+
+// A loop is multi-agent when it carries a non-empty ordered `agents:` chain.
+export function isMultiAgent(manifest) {
+  return Array.isArray(manifest?.agents) && manifest.agents.length > 0;
+}
+
+// Normalised roles for the run engine. Role 1 gets no prior output.
+export function rolesOf(manifest) {
+  return (manifest.agents || []).map((a) => ({
+    role: a.role,
+    persona: a.persona || null,
+    skills: Array.isArray(a.skills) ? a.skills : [],
+    prompt: a.prompt,
+  }));
+}
+
+// Every skill the loop touches: top-level (shared) ∪ per-role (additive).
+export function allSkills(manifest) {
+  const top = Array.isArray(manifest.skills) ? manifest.skills : [];
+  const perRole = (manifest.agents || []).flatMap((a) => (Array.isArray(a.skills) ? a.skills : []));
+  return [...new Set([...top, ...perRole])];
 }
 
 // A trigger that a harness must be able to honor. `schedule` accepts human
