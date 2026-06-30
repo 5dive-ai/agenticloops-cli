@@ -2,7 +2,7 @@
 // pre-flight `requires` (prompt-or-refuse, never auto-install) -> register the
 // scheduled job -> (on success) anonymous telemetry ping.
 import { fetchLoopMd, parseLoopMd, validateManifest, triggerOf } from "./loop.mjs";
-import { detectHarness, getHarness } from "./harness.mjs";
+import { detectHarness, getHarness, hostSkillsFor } from "./harness.mjs";
 import { planSkills, installSkill } from "./skills.mjs";
 import { preflight } from "./preflight.mjs";
 import { parseSchedule, registerTrigger, saveRecord } from "./schedule.mjs";
@@ -71,7 +71,9 @@ export async function install(ref, opts = {}) {
   }
 
   // 3. Install skills (§3.1) — host-satisfied skipped, paths fetched, bare resolved.
-  const skillPlan = await planSkills(manifest.skills || [], opts.hostSkills || []);
+  // Host-satisfied = verifiably present in the harness's skills dir (not asserted).
+  const hostSkills = [...new Set([...(opts.hostSkills || []), ...hostSkillsFor(harness.id)])];
+  const skillPlan = await planSkills(manifest.skills || [], hostSkills);
   if (skillPlan.length) {
     step("Skills");
     for (const s of skillPlan) {

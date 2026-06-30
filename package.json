@@ -1,6 +1,6 @@
 {
   "name": "agenticloops",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Install and run agentic loops — recurring AI agents defined in a single LOOP.md file. One file defines it; any harness can run it.",
   "type": "module",
   "bin": {

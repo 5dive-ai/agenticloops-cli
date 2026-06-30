@@ -2,8 +2,9 @@
 // loop's skills, honor its trigger, and run the prompt. Crucially, a loop needs
 // SCHEDULING — a harness that can only run interactively (an IDE) can run the
 // agent but cannot honor a recurring trigger; we warn when targeting one.
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 
 function has(bin) {
@@ -51,6 +52,32 @@ export const HARNESSES = [
 
 export function getHarness(id) {
   return HARNESSES.find((h) => h.id === id);
+}
+
+// Where each harness keeps installed skills (a dir of <skill>/SKILL.md). Used
+// to mark a skill "host-satisfied" only when it's VERIFIABLY present, so the
+// skip is honest — never an asserted-but-unchecked built-in.
+const SKILL_DIRS = {
+  "claude-code": [join(homedir(), ".claude", "skills")],
+  cursor: [join(homedir(), ".cursor", "skills")],
+  "5dive": [join(homedir(), ".claude", "skills")],
+};
+
+export function hostSkillsFor(harnessId) {
+  const dirs = SKILL_DIRS[harnessId] || [];
+  const found = new Set();
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    try {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory() && existsSync(join(p, "SKILL.md"))) found.add(name);
+      }
+    } catch {
+      /* unreadable dir — skip */
+    }
+  }
+  return [...found];
 }
 
 // Auto-detect: prefer a schedulable harness when several are present, since a
