@@ -68,9 +68,20 @@ async function cmdInstall(positional, flags) {
 async function cmdRun(positional, flags) {
   const ref = positional[0];
   if (!ref) throw new CliError("usage: agenticloops run <owner/loop|path>", 2);
+  // --agents=role:agent,role:agent maps chain roles to 5dive agents (5dive backend).
+  let roleAgents;
+  if (typeof flags.agents === "string") {
+    roleAgents = {};
+    for (const pair of flags.agents.split(",")) {
+      const [role, agent] = pair.split(":");
+      if (role && agent) roleAgents[role.trim()] = agent.trim();
+    }
+  }
   const res = await runLoop(ref, {
     harness: typeof flags.harness === "string" ? flags.harness : undefined,
     backend: typeof flags.backend === "string" ? flags.backend : undefined,
+    roleAgents,
+    agent: typeof flags.agent === "string" ? flags.agent : undefined,
   });
   if (flags.json) process.stdout.write(JSON.stringify(res.signed || res.receipt, null, 2) + "\n");
   process.exitCode = res.ok ? 0 : 1;

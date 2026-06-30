@@ -39,7 +39,7 @@ export async function runLoop(ref, opts = {}) {
     : detectHarness().harness;
   if (!harness) throw new CliError("no harness detected — pass --harness=<id>", 4);
 
-  const backend = pickBackend(harness, opts);
+  const backend = pickBackend(harness, { ...opts, loop: manifest.name });
   step(`Running ${c.bold(manifest.name)} — ${roles.length} role${roles.length > 1 ? "s" : ""} · ${backend.label}`);
 
   const result = await runChain(manifest.name, roles, backend, {

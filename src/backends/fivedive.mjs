@@ -28,6 +28,25 @@ function ensureHeartbeat(agent) {
   sh(["heartbeat", "on", agent]);
 }
 
+function nudgeTick() {
+  // Wake due agents NOW instead of waiting for the heartbeat cron, so a
+  // run-now chain doesn't stall up to the tick interval. Best-effort; needs root.
+  spawnSync("sudo", ["5dive", "heartbeat", "tick"], { encoding: "utf8" });
+}
+
+// The handoff instruction the heartbeat-woken agent needs: it sees ONLY the task
+// body (no agent-send), so the body must tell it to finish by completing the
+// task with its full output as --result (that result IS the next role's input).
+function withHandoffInstruction(prompt) {
+  return (
+    `${prompt}\n\n` +
+    `--- how to finish (required) ---\n` +
+    `Complete THIS task with your full, self-contained output as the result:\n` +
+    `  5dive task done <this-task-id> --result="<your output>"\n` +
+    `Your result is the ONLY thing passed to the next role — make it complete.`
+  );
+}
+
 function pollTask(taskId) {
   const r = sh(["task", "show", taskId, "--json"]);
   if (r.status !== 0) return { status: "unknown" };
@@ -53,8 +72,9 @@ export function fivediveBackend(opts = {}) {
       if (!agent) {
         return { status: "error", output: "", error: `no agent mapped for role "${role}" (set roleAgents or --agent)` };
       }
-      const taskId = taskAdd({ title: `${opts.loop || "loop"}:${role}`, body: prompt, assignee: agent });
+      const taskId = taskAdd({ title: `${opts.loop || "loop"}:${role}`, body: withHandoffInstruction(prompt), assignee: agent });
       ensureHeartbeat(agent);
+      if (opts.nudge !== false) nudgeTick();
       onLog?.(`task ${taskId} → ${agent} (heartbeat wake)`);
 
       const deadline = Date.now() + timeoutMs;
