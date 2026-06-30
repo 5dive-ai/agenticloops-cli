@@ -1,6 +1,6 @@
 // Run receipts — REUSE the canonical openagent receipt scheme so the bytes match
 // card provenance, A2A handshakes, and zerohuman edges (one verifier ranks the
-// whole directory: "proof, not popularity"). We import lib/receipts.js verbatim
+// whole directory: "proof, not popularity"). We import lib/receipts.js directly
 // from the published @5dive/openagent and reimplement only the tiny keystore
 // loader on lib/provenance.js (keystore.js isn't published) — SAME
 // ~/.openagent/agent.key path + SAME keygen, so the did:key is byte-identical.
@@ -15,10 +15,10 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-// receipts.js is vendored verbatim (newer than the last openagent npm release);
-// provenance.js comes straight from the published package. Both produce
-// byte-identical signatures to card provenance / zerohuman edges.
-const receipts = require("./vendor/receipts.cjs");
+// Both come straight from the published @5dive/openagent package (>=0.35.0 ships
+// lib/receipts.js), so signatures are byte-identical to card provenance /
+// zerohuman edges — no vendored copy to drift from the canonical scheme.
+const receipts = require("@5dive/openagent/lib/receipts.js");
 const provenance = require("@5dive/openagent/lib/provenance.js");
 
 function agentHome() {
