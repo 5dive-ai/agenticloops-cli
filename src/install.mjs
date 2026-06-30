@@ -1,7 +1,7 @@
 // The install flow (SPEC §3): fetch+validate LOOP.md -> install skills ->
 // pre-flight `requires` (prompt-or-refuse, never auto-install) -> register the
 // scheduled job -> (on success) anonymous telemetry ping.
-import { fetchLoopMd, parseLoopMd, validateManifest, triggerOf } from "./loop.mjs";
+import { fetchLoopMd, parseLoopMd, validateManifest, triggerOf, isMultiAgent, rolesOf, allSkills } from "./loop.mjs";
 import { detectHarness, getHarness, hostSkillsFor } from "./harness.mjs";
 import { planSkills, installSkill } from "./skills.mjs";
 import { preflight } from "./preflight.mjs";
@@ -39,8 +39,10 @@ export async function install(ref, opts = {}) {
   }
   const slug = manifest.name;
   const trig = triggerOf(manifest);
+  const multi = isMultiAgent(manifest);
   ok(`${c.bold(manifest.name)} — ${manifest.description?.split("\n")[0] ?? ""}`);
   info(`trigger: ${trig.kind === "event" ? `on ${trig.value}` : trig.value}`);
+  if (multi) info(`multi-agent: ${rolesOf(manifest).map((r) => r.role).join(" → ")} ${c.dim("(sequential chain)")}`);
 
   // 2. Pick the harness (auto-detect unless --harness given) + warn if it can't schedule.
   step("Target harness");
@@ -73,7 +75,8 @@ export async function install(ref, opts = {}) {
   // 3. Install skills (§3.1) — host-satisfied skipped, paths fetched, bare resolved.
   // Host-satisfied = verifiably present in the harness's skills dir (not asserted).
   const hostSkills = [...new Set([...(opts.hostSkills || []), ...hostSkillsFor(harness.id)])];
-  const skillPlan = await planSkills(manifest.skills || [], hostSkills);
+  // Multi-agent: install the union of shared + per-role skills.
+  const skillPlan = await planSkills(multi ? allSkills(manifest) : manifest.skills || [], hostSkills);
   if (skillPlan.length) {
     step("Skills");
     for (const s of skillPlan) {
@@ -140,13 +143,18 @@ export async function install(ref, opts = {}) {
     trigger: trig,
     cron: sched.cron || null,
     description: manifest.description,
+    multiAgent: multi,
+    roles: multi ? rolesOf(manifest).map((r) => r.role) : null,
     installedAt: new Date().toISOString(),
   };
   if (!dryRun) saveRecord(slug, record, fetched.raw);
+  // A multi-agent loop's scheduled body runs the whole chain via the CLI; a
+  // single-prompt loop's body is the prompt itself.
+  const body = multi ? `npx agenticloops run ${loopRef} --harness=${harness.id}` : prompt;
   const reg = registerTrigger(harness.id, {
     slug,
     name: manifest.name,
-    prompt,
+    prompt: body,
     cron: sched.cron || manifest.schedule || "",
     dryRun,
   });
@@ -164,5 +172,12 @@ export async function install(ref, opts = {}) {
   step(`${sym.ok} Installed ${c.bold(slug)} on ${harness.label}${dryRun ? c.dim(" (dry-run)") : ""}`);
   if (reg.scheduled === false && trig.needsScheduler)
     info(`it won't fire until you wire a scheduler — see ${c.cyan("agenticloops list")}`);
+
+  // --run executes the chain once now (the install-and-it-runs demo moment).
+  if (opts.run && !dryRun) {
+    const { runLoop } = await import("./runcmd.mjs");
+    const res = await runLoop(loopRef, { harness: harness.id });
+    return { ...record, firstRun: res.receipt, signed: res.signed };
+  }
   return record;
 }

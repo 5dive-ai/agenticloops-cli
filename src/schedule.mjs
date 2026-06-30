@@ -70,8 +70,9 @@ export function removeRecord(slug) {
 // --- harness adapters: register the recurring trigger -----------------------
 
 function registerOn5dive({ name, prompt, cron, dryRun }) {
-  const args = ["task", "add", name, "--body", prompt, "--recurring", cron];
-  if (dryRun) return { ok: true, detail: `5dive ${args.join(" ")}`, skipped: "dry-run" };
+  // 5dive flags are =form (`--body=x`, not `--body x`) — caught in the spike.
+  const args = ["task", "add", name, `--body=${prompt}`, `--recurring=${cron}`];
+  if (dryRun) return { ok: true, detail: `5dive task add ${name} --recurring=${cron}`, skipped: "dry-run" };
   const res = spawnSync("5dive", args, { stdio: "inherit" });
   return { ok: res.status === 0, detail: `5dive ${args.join(" ")}`, status: res.status };
 }

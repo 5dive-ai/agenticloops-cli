@@ -61,6 +61,7 @@ async function cmdInstall(positional, flags) {
     noTelemetry: !!flags["no-telemetry"],
     yes: !!flags.yes,
     dryRun: !!flags["dry-run"],
+    run: !!flags.run, // --run: execute the chain once right after install
   });
 }
 
@@ -109,8 +110,12 @@ async function cmdList() {
   for (const r of recs) {
     const n = installs[r.slug];
     const sched = r.cron ? r.cron : r.trigger?.value || "?";
+    const kind = r.multiAgent
+      ? c.cyan(`multi-agent: ${(r.roles || []).join(" → ")}`)
+      : c.dim("single-agent");
     process.stdout.write(
       `${c.bold(r.slug)}  ${c.dim("on " + r.harness)}${typeof n === "number" ? c.dim("  " + n + "↓ globally") : ""}\n` +
+        `  ${kind}\n` +
         `  ${c.cyan(sched)} — ${(r.description || "").split("\n")[0]}\n` +
         `  ${c.dim(r.source || r.ref)}\n\n`,
     );
