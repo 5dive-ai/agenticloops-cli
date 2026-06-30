@@ -76,7 +76,8 @@ export async function install(ref, opts = {}) {
     step("Skills");
     for (const s of skillPlan) {
       if (s.action === "host") info(`${s.id} ${c.dim("(provided by harness — skipped)")}`);
-      else if (s.action === "unresolved") warn(`${s.id} — unresolvable, skipped (loop will degrade)`);
+      else if (s.action === "unresolved")
+        warn(`${s.id} — skipped (loop will degrade)${s.reason ? c.dim(" — " + s.reason) : ""}`);
       else {
         const r = installSkill(s, { dryRun });
         if (r.ok) ok(`${s.id} ${c.dim("<- " + s.owner + "/" + s.repo)}`);

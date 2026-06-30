@@ -7,7 +7,7 @@ import { listRecords, parseSchedule } from "../src/schedule.mjs";
 import { fetchInstalls } from "../src/telemetry.mjs";
 import { c, sym, fail, info, CliError } from "../src/util.mjs";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 function parseArgs(argv) {
   const flags = {};

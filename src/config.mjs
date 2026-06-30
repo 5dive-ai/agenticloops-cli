@@ -15,4 +15,4 @@ export const SKILLS_REGISTRY_URL = "https://skills.sh/index.json";
 export const SPEC_VERSION = "0.1";
 
 // User-Agent so server logs can attribute pings to the CLI (still anonymous).
-export const UA = `agenticloops-cli/0.1.0 (+${SITE})`;
+export const UA = `agenticloops-cli/0.1.1 (+${SITE})`;
