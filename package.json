@@ -1,0 +1,40 @@
+{
+  "name": "agenticloops",
+  "version": "0.1.0",
+  "description": "Install and run agentic loops — recurring AI agents defined in a single LOOP.md file. One file defines it; any harness can run it.",
+  "type": "module",
+  "bin": {
+    "agenticloops": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "agentic-loop",
+    "agentic-loops",
+    "ai-agent",
+    "scheduler",
+    "loop",
+    "skills",
+    "claude",
+    "cron",
+    "automation"
+  ],
+  "homepage": "https://agenticloops.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/5dive-ai/agenticloops.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "yaml": "^2.4.5"
+  }
+}
