@@ -8,6 +8,7 @@ import { portableBackend } from "./backends/portable.mjs";
 import { fivediveBackend } from "./backends/fivedive.mjs";
 import { runChain } from "./chain.mjs";
 import { signRunReceipt } from "./receipt.mjs";
+import { acquireRunLock, DEFAULT_CONCURRENCY } from "./lock.mjs";
 import { c, info, ok, warn, fail, step, CliError } from "./util.mjs";
 
 function pickBackend(harness, opts) {
@@ -58,17 +59,32 @@ export async function runLoop(ref, opts = {}) {
     else if (backend.budgetNotice) warn(backend.budgetNotice);
   }
 
-  const result = await runChain(manifest.name, roles, backend, {
-    onStep: (s) => {
-      if (s.phase === "start")
-        info(`role ${s.index}/${s.total}: ${c.bold(s.role)}${s.handoffChars ? c.dim(` ← ${s.handoffChars} chars`) : ""}`);
-      else if (s.phase === "done")
-        s.status === "done"
-          ? ok(`${s.role} ${c.dim(s.ref ? "(" + s.ref + ")" : "")}`)
-          : fail(`${s.role} → ${s.status}${s.error ? ": " + s.error : ""}`);
-      else if (s.phase === "log") info(c.dim(`  ${s.message}`));
-    },
-  });
+  // Overlap policy (SPEC.md §2). A schedule firing while a prior run is still
+  // going is coordinated here per `concurrency` (default skip): don't stack runs
+  // on a tight schedule. `run --force` bypasses it for a manual local test.
+  const concurrency = manifest.concurrency || DEFAULT_CONCURRENCY;
+  const lock = await acquireRunLock(manifest.name, concurrency, { force: !!opts.force, log: (m) => info(c.dim(m)) });
+  if (!lock.acquired) {
+    warn(`skipping run: ${lock.reason}`);
+    return { ok: true, skipped: true, receipt: { loop: manifest.name, skipped: true, reason: lock.reason } };
+  }
+
+  let result;
+  try {
+    result = await runChain(manifest.name, roles, backend, {
+      onStep: (s) => {
+        if (s.phase === "start")
+          info(`role ${s.index}/${s.total}: ${c.bold(s.role)}${s.handoffChars ? c.dim(` ← ${s.handoffChars} chars`) : ""}`);
+        else if (s.phase === "done")
+          s.status === "done"
+            ? ok(`${s.role} ${c.dim(s.ref ? "(" + s.ref + ")" : "")}`)
+            : fail(`${s.role} → ${s.status}${s.error ? ": " + s.error : ""}`);
+        else if (s.phase === "log") info(c.dim(`  ${s.message}`));
+      },
+    });
+  } finally {
+    lock.release();
+  }
 
   const at = new Date().toISOString();
   result.receipt.ranAt = at;
