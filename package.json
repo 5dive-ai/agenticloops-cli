@@ -31,7 +31,10 @@
   "homepage": "https://agenticloops.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/5dive-ai/agenticloops.git"
+    "url": "git+https://github.com/5dive-ai/agenticloops-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/5dive-ai/agenticloops-cli/issues"
   },
   "license": "MIT",
   "dependencies": {
