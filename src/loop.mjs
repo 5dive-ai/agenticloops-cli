@@ -99,6 +99,14 @@ export function validateManifest(manifest) {
   if (m.skills && !Array.isArray(m.skills)) errs.push("`skills` must be a list");
   if (m.requires && typeof m.requires !== "object") errs.push("`requires` must be a mapping");
 
+  // `budget` — optional per-run spend cap (sibling to `timeout`). Either a token
+  // count (`200000`, `200k`, `1.5m`) or a cost (`$2.00`). Harness-mapped, never a
+  // vendor billing SKU. Reject anything else.
+  if (m.budget !== undefined && parseBudget(m.budget) === null)
+    errs.push(
+      "`budget` must be a token count (e.g. 200k, 1.5m) or a cost (e.g. $2.00)",
+    );
+
   // Multi-agent (§ agents:) — an ordered chain of role-prompts. Additive: a loop
   // with no `agents:` is the single-prompt body, unchanged.
   if (m.agents !== undefined) {
@@ -121,6 +129,30 @@ export function validateManifest(manifest) {
   }
 
   return errs;
+}
+
+// Parse a `budget:` value into { kind: "tokens", tokens } or { kind: "cost", cost }.
+// Accepts the token form (bare int, or int/decimal + k|m suffix) and the cost form
+// ($ + decimal). Returns null for anything invalid (non-positive, junk, wrong type).
+// YAML gives us a bare int as a number and the suffixed/`$` forms as strings.
+export function parseBudget(v) {
+  if (typeof v === "number") {
+    return Number.isFinite(v) && v > 0 ? { kind: "tokens", tokens: v } : null;
+  }
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  const cost = /^\$(\d+(?:\.\d+)?)$/.exec(s);
+  if (cost) {
+    const n = Number(cost[1]);
+    return n > 0 ? { kind: "cost", cost: n } : null;
+  }
+  const tok = /^(\d+(?:\.\d+)?)([km])?$/i.exec(s);
+  if (tok) {
+    const mult = tok[2] ? (tok[2].toLowerCase() === "m" ? 1e6 : 1e3) : 1;
+    const n = Number(tok[1]) * mult;
+    return n > 0 ? { kind: "tokens", tokens: n } : null;
+  }
+  return null;
 }
 
 // A loop is multi-agent when it carries a non-empty ordered `agents:` chain.

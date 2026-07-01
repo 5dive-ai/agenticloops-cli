@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseLoopMd, validateManifest, parseRef, triggerOf } from "../src/loop.mjs";
+import { parseLoopMd, validateManifest, parseBudget, parseRef, triggerOf } from "../src/loop.mjs";
 import { parseSchedule } from "../src/schedule.mjs";
 import { parseSkillEntry } from "../src/skills.mjs";
 import { preflight } from "../src/preflight.mjs";
@@ -30,6 +30,29 @@ test("validateManifest catches missing required fields", () => {
   assert.ok(validateManifest({ name: "x", description: "y" }).some((e) => /trigger/.test(e)));
   assert.ok(validateManifest({ name: "BAD NAME", description: "d", schedule: "daily" }).some((e) => /kebab/.test(e)));
   assert.ok(validateManifest({ name: "x", description: "d", schedule: "daily", tier: "opus" }).some((e) => /tier/.test(e)));
+});
+
+test("parseBudget accepts token and cost forms", () => {
+  assert.deepEqual(parseBudget(200000), { kind: "tokens", tokens: 200000 });
+  assert.deepEqual(parseBudget("200k"), { kind: "tokens", tokens: 200000 });
+  assert.deepEqual(parseBudget("1.5m"), { kind: "tokens", tokens: 1.5e6 });
+  assert.deepEqual(parseBudget("2M"), { kind: "tokens", tokens: 2e6 });
+  assert.deepEqual(parseBudget("$2.00"), { kind: "cost", cost: 2 });
+  assert.deepEqual(parseBudget("$0.5"), { kind: "cost", cost: 0.5 });
+});
+
+test("parseBudget rejects junk and non-positive values", () => {
+  for (const bad of ["", "abc", "200kb", "$", "$-1", "-5", "0", "0k", "$0", "1.5x", "k", true, null, {}])
+    assert.equal(parseBudget(bad), null, `expected null for ${JSON.stringify(bad)}`);
+});
+
+test("validateManifest checks budget", () => {
+  const base = { name: "x", description: "d", schedule: "daily" };
+  assert.deepEqual(validateManifest({ ...base, budget: "200k" }), []);
+  assert.deepEqual(validateManifest({ ...base, budget: "$2.00" }), []);
+  assert.deepEqual(validateManifest({ ...base, budget: 500000 }), []);
+  assert.ok(validateManifest({ ...base, budget: "lots" }).some((e) => /budget/.test(e)));
+  assert.ok(validateManifest({ ...base, budget: "$abc" }).some((e) => /budget/.test(e)));
 });
 
 test("parseRef handles owner/repo and subpaths", () => {
