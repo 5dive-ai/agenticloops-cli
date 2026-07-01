@@ -5,10 +5,22 @@
 // loop file is identical across harnesses. Used for every non-5dive harness.
 import { spawn } from "node:child_process";
 
-function runOnce(cmd, prompt, { timeout = 180000 } = {}) {
+// Map a normalized budget (from normalizeBudget) to the harness CLI's native
+// budget flags. Today only the claude headless CLI exposes one: --max-budget-usd,
+// a HARD dollar ceiling. The cost form maps to it directly. The token form's soft
+// task_budget countdown has NO headless flag, so we emit nothing rather than
+// fabricate a cap — that mapping belongs to the native runner (task_budget /
+// server-side token accounting). Unknown harnesses (codex, …): no flags.
+export function budgetCliArgs(cmd, budget) {
+  if (!budget || cmd[0] !== "claude") return [];
+  if (budget.kind === "cost") return ["--max-budget-usd", String(budget.cost)];
+  return [];
+}
+
+function runOnce(cmd, prompt, { timeout = 180000 } = {}, budgetArgs = []) {
   return new Promise((resolve) => {
     const [bin, ...args] = cmd;
-    const child = spawn(bin, [...args, prompt], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(bin, [...args, ...budgetArgs, prompt], { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
     const timer = setTimeout(() => child.kill("SIGKILL"), timeout);
@@ -30,10 +42,11 @@ function runOnce(cmd, prompt, { timeout = 180000 } = {}) {
 export function portableBackend(headlessCmd, opts = {}) {
   if (!Array.isArray(headlessCmd) || !headlessCmd.length)
     throw new Error("portable backend needs a headlessCmd, e.g. [\"claude\",\"-p\"]");
+  const budgetArgs = budgetCliArgs(headlessCmd, opts.budget);
   return {
-    label: `portable (${headlessCmd.join(" ")})`,
+    label: `portable (${headlessCmd.join(" ")})${budgetArgs.length ? " · " + budgetArgs.join(" ") : ""}`,
     async runRole({ prompt }) {
-      const r = await runOnce(headlessCmd, prompt, opts);
+      const r = await runOnce(headlessCmd, prompt, opts, budgetArgs);
       return {
         status: r.ok ? "done" : "error",
         output: r.output,

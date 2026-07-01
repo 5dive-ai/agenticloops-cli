@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseLoopMd, validateManifest, parseBudget, parseRef, triggerOf } from "../src/loop.mjs";
+import { parseLoopMd, validateManifest, parseBudget, normalizeBudget, TASK_BUDGET_MIN_TOKENS, parseRef, triggerOf } from "../src/loop.mjs";
+import { budgetCliArgs } from "../src/backends/portable.mjs";
+import { budgetNote } from "../src/backends/fivedive.mjs";
 import { parseSchedule } from "../src/schedule.mjs";
 import { parseSkillEntry } from "../src/skills.mjs";
 import { preflight } from "../src/preflight.mjs";
@@ -53,6 +55,27 @@ test("validateManifest checks budget", () => {
   assert.deepEqual(validateManifest({ ...base, budget: 500000 }), []);
   assert.ok(validateManifest({ ...base, budget: "lots" }).some((e) => /budget/.test(e)));
   assert.ok(validateManifest({ ...base, budget: "$abc" }).some((e) => /budget/.test(e)));
+});
+
+test("normalizeBudget clamps token budget up to the task_budget floor", () => {
+  assert.deepEqual(normalizeBudget("5k"), { kind: "tokens", tokens: TASK_BUDGET_MIN_TOKENS });
+  assert.deepEqual(normalizeBudget("200k"), { kind: "tokens", tokens: 200000 });
+  assert.deepEqual(normalizeBudget("$2.00"), { kind: "cost", cost: 2 }); // cost not clamped
+  assert.equal(normalizeBudget(undefined), null);
+  assert.equal(normalizeBudget("junk"), null);
+});
+
+test("budgetCliArgs maps cost form to --max-budget-usd for claude only", () => {
+  assert.deepEqual(budgetCliArgs(["claude", "-p"], { kind: "cost", cost: 2 }), ["--max-budget-usd", "2"]);
+  assert.deepEqual(budgetCliArgs(["claude", "-p"], { kind: "tokens", tokens: 200000 }), []); // no headless task_budget flag
+  assert.deepEqual(budgetCliArgs(["codex", "exec"], { kind: "cost", cost: 2 }), []); // unknown harness
+  assert.deepEqual(budgetCliArgs(["claude", "-p"], null), []);
+});
+
+test("budgetNote surfaces the ceiling to the 5dive-woken agent", () => {
+  assert.equal(budgetNote(null), "");
+  assert.match(budgetNote({ kind: "tokens", tokens: 200000 }), /200000 tokens.*[Ss]elf-moderate/s);
+  assert.match(budgetNote({ kind: "cost", cost: 2 }), /\$2.*[Ss]top/s);
 });
 
 test("parseRef handles owner/repo and subpaths", () => {

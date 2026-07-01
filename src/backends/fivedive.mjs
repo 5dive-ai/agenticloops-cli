@@ -47,6 +47,19 @@ function withHandoffInstruction(prompt) {
   );
 }
 
+// The whole-loop `budget:` ceiling, surfaced to the woken agent. The native path
+// (a `5dive task add` budget flag → the agent session's task_budget) doesn't
+// exist yet, so the honest interim is to tell the agent — a full Claude session
+// that CAN self-moderate — its ceiling in the task body. Token form → a countdown
+// to self-moderate against; cost form → a hard spend ceiling to stop before.
+export function budgetNote(budget) {
+  if (!budget) return "";
+  const head = `\n\n--- budget (whole loop) ---\n`;
+  if (budget.kind === "tokens")
+    return `${head}Token budget: ~${budget.tokens} tokens for the run. Self-moderate against it — wrap up and hand off as you approach the ceiling.`;
+  return `${head}Spend ceiling: $${budget.cost} for the run. Stop and hand off before you cross it.`;
+}
+
 function pollTask(taskId) {
   const r = sh(["task", "show", taskId, "--json"]);
   if (r.status !== 0) return { status: "unknown" };
@@ -72,7 +85,8 @@ export function fivediveBackend(opts = {}) {
       if (!agent) {
         return { status: "error", output: "", error: `no agent mapped for role "${role}" (set roleAgents or --agent)` };
       }
-      const taskId = taskAdd({ title: `${opts.loop || "loop"}:${role}`, body: withHandoffInstruction(prompt), assignee: agent });
+      const body = withHandoffInstruction(prompt) + budgetNote(opts.budget);
+      const taskId = taskAdd({ title: `${opts.loop || "loop"}:${role}`, body, assignee: agent });
       ensureHeartbeat(agent);
       if (opts.nudge !== false) nudgeTick();
       onLog?.(`task ${taskId} → ${agent} (heartbeat wake)`);

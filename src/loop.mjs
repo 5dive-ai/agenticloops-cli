@@ -155,6 +155,22 @@ export function parseBudget(v) {
   return null;
 }
 
+// Anthropic task-budgets floor: a native task_budget below this yields no useful
+// countdown, so we clamp UP to it (per spec guidance) rather than reject.
+export const TASK_BUDGET_MIN_TOKENS = 20000;
+
+// Normalize a validated `budget:` for a runner. Returns the same shape as
+// parseBudget, but clamps a token budget up to the task_budget floor so a small
+// value still maps to a usable countdown. null when absent/invalid.
+export function normalizeBudget(v) {
+  if (v === undefined) return null;
+  const b = parseBudget(v);
+  if (!b) return null;
+  if (b.kind === "tokens")
+    return { kind: "tokens", tokens: Math.max(b.tokens, TASK_BUDGET_MIN_TOKENS) };
+  return b;
+}
+
 // A loop is multi-agent when it carries a non-empty ordered `agents:` chain.
 export function isMultiAgent(manifest) {
   return Array.isArray(manifest?.agents) && manifest.agents.length > 0;

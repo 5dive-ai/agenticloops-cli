@@ -26,7 +26,7 @@ const HELP = `${c.bold("agenticloops")} — install and run agentic loops ${c.di
 
 ${c.bold("Usage")}
   npx agenticloops install <owner/loop> [--harness=<id>] [--no-telemetry] [--yes] [--dry-run]
-  npx agenticloops run <owner/loop|path> [--harness=<id>] [--backend=portable|5dive]
+  npx agenticloops run <owner/loop|path> [--harness=<id>] [--backend=portable|5dive] [--budget=<200k|$2.00>]
   npx agenticloops find <query>
   npx agenticloops list
   npx agenticloops update [<slug>]
@@ -82,6 +82,7 @@ async function cmdRun(positional, flags) {
     backend: typeof flags.backend === "string" ? flags.backend : undefined,
     roleAgents,
     agent: typeof flags.agent === "string" ? flags.agent : undefined,
+    budget: typeof flags.budget === "string" ? flags.budget : undefined,
   });
   if (flags.json) process.stdout.write(JSON.stringify(res.signed || res.receipt, null, 2) + "\n");
   process.exitCode = res.ok ? 0 : 1;
