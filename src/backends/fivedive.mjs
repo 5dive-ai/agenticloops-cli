@@ -54,7 +54,7 @@ function withHandoffInstruction(prompt) {
 // to self-moderate against; cost form → a hard spend ceiling to stop before.
 export function budgetNote(budget) {
   if (!budget) return "";
-  const head = `\n\n--- budget (whole loop) ---\n`;
+  const head = `\n\n--- budget (whole loop · advisory, self-moderated) ---\n`;
   if (budget.kind === "tokens")
     return `${head}Token budget: ~${budget.tokens} tokens for the run. Self-moderate against it — wrap up and hand off as you approach the ceiling.`;
   return `${head}Spend ceiling: $${budget.cost} for the run. Stop and hand off before you cross it.`;
@@ -78,8 +78,16 @@ export function fivediveBackend(opts = {}) {
   const pollEveryMs = opts.pollEveryMs || 10000;
   const timeoutMs = opts.timeoutMs || 30 * 60 * 1000;
 
+  // Budget on the native handoff is ADVISORY: the woken agent self-moderates via
+  // the body note — there's no hard per-task cap until `5dive task add` carries one.
+  const budgetStatus = opts.budget ? "advisory" : null;
+  const budgetNotice = opts.budget
+    ? `budget is advisory on the 5dive backend — the woken agent self-moderates; no hard per-task cap yet`
+    : null;
   return {
     label: "5dive (linked tasks · heartbeat wake · structured result)",
+    budgetStatus,
+    budgetNotice,
     async runRole({ role, prompt, onLog }) {
       const agent = roleAgents[role] || fallback;
       if (!agent) {

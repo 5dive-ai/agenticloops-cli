@@ -43,8 +43,24 @@ export function portableBackend(headlessCmd, opts = {}) {
   if (!Array.isArray(headlessCmd) || !headlessCmd.length)
     throw new Error("portable backend needs a headlessCmd, e.g. [\"claude\",\"-p\"]");
   const budgetArgs = budgetCliArgs(headlessCmd, opts.budget);
+  // Honesty: a budget with no native flag is ADVISORY here, never silently
+  // dropped — the caller surfaces budgetNotice so it never reads as enforced.
+  let budgetStatus = null;
+  let budgetNotice = null;
+  if (opts.budget) {
+    if (budgetArgs.length) budgetStatus = "enforced";
+    else {
+      budgetStatus = "advisory";
+      budgetNotice =
+        opts.budget.kind === "tokens"
+          ? `token budget is advisory on this backend (no hard token cap available via ${headlessCmd.join(" ")}) — use a $ budget for a hard ceiling`
+          : `budget is advisory on this backend (${headlessCmd.join(" ")} has no budget flag)`;
+    }
+  }
   return {
     label: `portable (${headlessCmd.join(" ")})${budgetArgs.length ? " · " + budgetArgs.join(" ") : ""}`,
+    budgetStatus,
+    budgetNotice,
     async runRole({ prompt }) {
       const r = await runOnce(headlessCmd, prompt, opts, budgetArgs);
       return {

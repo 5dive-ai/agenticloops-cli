@@ -50,6 +50,14 @@ export async function runLoop(ref, opts = {}) {
   const backend = pickBackend(harness, { ...opts, budget, loop: manifest.name });
   step(`Running ${c.bold(manifest.name)} — ${roles.length} role${roles.length > 1 ? "s" : ""} · ${backend.label}`);
 
+  // Never let a budget read as enforced when it isn't: a hard cap gets a plain
+  // note; a soft/advisory budget gets a warn so the user knows to use $ for a cap.
+  if (budget) {
+    if (backend.budgetStatus === "enforced")
+      info(c.dim(`budget: hard $${budget.cost} ceiling (${backend.budgetNotice || "--max-budget-usd"})`));
+    else if (backend.budgetNotice) warn(backend.budgetNotice);
+  }
+
   const result = await runChain(manifest.name, roles, backend, {
     onStep: (s) => {
       if (s.phase === "start")

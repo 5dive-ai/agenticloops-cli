@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseLoopMd, validateManifest, parseBudget, normalizeBudget, TASK_BUDGET_MIN_TOKENS, parseRef, triggerOf } from "../src/loop.mjs";
-import { budgetCliArgs } from "../src/backends/portable.mjs";
+import { budgetCliArgs, portableBackend } from "../src/backends/portable.mjs";
+import { fivediveBackend } from "../src/backends/fivedive.mjs";
 import { budgetNote } from "../src/backends/fivedive.mjs";
 import { parseSchedule } from "../src/schedule.mjs";
 import { parseSkillEntry } from "../src/skills.mjs";
@@ -74,8 +75,29 @@ test("budgetCliArgs maps cost form to --max-budget-usd for claude only", () => {
 
 test("budgetNote surfaces the ceiling to the 5dive-woken agent", () => {
   assert.equal(budgetNote(null), "");
+  assert.match(budgetNote({ kind: "tokens", tokens: 200000 }), /advisory/);
   assert.match(budgetNote({ kind: "tokens", tokens: 200000 }), /200000 tokens.*[Ss]elf-moderate/s);
   assert.match(budgetNote({ kind: "cost", cost: 2 }), /\$2.*[Ss]top/s);
+});
+
+test("backends label budget enforced vs advisory honestly", () => {
+  // cost + claude portable → hard cap, no advisory notice
+  const cost = portableBackend(["claude", "-p"], { budget: { kind: "cost", cost: 2 } });
+  assert.equal(cost.budgetStatus, "enforced");
+  assert.equal(cost.budgetNotice, null);
+  // token + claude portable → advisory, notice steers to $ budget
+  const tok = portableBackend(["claude", "-p"], { budget: { kind: "tokens", tokens: 200000 } });
+  assert.equal(tok.budgetStatus, "advisory");
+  assert.match(tok.budgetNotice, /advisory.*\$ budget/s);
+  // codex → even cost is advisory (no flag)
+  const codex = portableBackend(["codex", "exec"], { budget: { kind: "cost", cost: 2 } });
+  assert.equal(codex.budgetStatus, "advisory");
+  // 5dive backend → always advisory when a budget is set
+  const fd = fivediveBackend({ budget: { kind: "cost", cost: 2 }, agent: "x" });
+  assert.equal(fd.budgetStatus, "advisory");
+  assert.match(fd.budgetNotice, /advisory/);
+  // no budget → null
+  assert.equal(portableBackend(["claude", "-p"], {}).budgetStatus, null);
 });
 
 test("parseRef handles owner/repo and subpaths", () => {
