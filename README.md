@@ -4,7 +4,7 @@ Install and run **agentic loops** — recurring AI agents defined in a single
 [`LOOP.md`](https://github.com/5dive-ai/loops/blob/main/SPEC.md) file: a trigger,
 a set of skills, and a prompt. One file defines it; any harness can run it.
 
-The directory lives at **[agenticloops.dev](https://agenticloops.dev)**. This is
+The directory lives at **[agenticloops.dev](https://agenticloops.dev?utm_source=github&utm_medium=referral&utm_campaign=agenticloops-cli-readme)**. This is
 the install CLI — the loop-level analogue of `npx skills add`.
 
 ```bash
