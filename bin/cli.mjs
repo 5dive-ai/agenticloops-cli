@@ -7,8 +7,10 @@ import { loadRegistry, search } from "../src/registry.mjs";
 import { listRecords, parseSchedule } from "../src/schedule.mjs";
 import { fetchInstalls } from "../src/telemetry.mjs";
 import { c, sym, fail, info, CliError } from "../src/util.mjs";
+import { readFileSync } from "node:fs";
 
-const VERSION = "0.1.2";
+// Single source of truth — the hardcoded copy here drifted (0.1.2 vs 0.3.0).
+const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 function parseArgs(argv) {
   const flags = {};

@@ -2,6 +2,8 @@
 // schedule fires (a recurring 5dive task / GH Actions job calls it), and it's
 // how you test a loop locally. Routes to a backend by harness: 5dive uses the
 // native linked-task chain; everything else uses the portable headless runner.
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { fetchLoopMd, parseLoopMd, validateManifest, normalizeBudget, isMultiAgent, rolesOf } from "./loop.mjs";
 import { detectHarness, getHarness } from "./harness.mjs";
 import { portableBackend } from "./backends/portable.mjs";
@@ -9,7 +11,33 @@ import { fivediveBackend } from "./backends/fivedive.mjs";
 import { runChain } from "./chain.mjs";
 import { signRunReceipt } from "./receipt.mjs";
 import { acquireRunLock, DEFAULT_CONCURRENCY } from "./lock.mjs";
+import { loadRegistry, resolveSlug } from "./registry.mjs";
+import { recordPath } from "./schedule.mjs";
 import { c, info, ok, warn, fail, step, CliError } from "./util.mjs";
+
+// A bare slug resolves the same way install's does: the locally installed copy
+// first (run exactly what was installed — works offline), then the public
+// directory. Returns { fetched } for an installed copy, { ref } to fetch.
+export async function resolveRunSource(ref) {
+  const r = String(ref).trim();
+  if (r.includes("/") || r.endsWith("LOOP.md")) return { ref: r };
+  const file = join(recordPath(r), "LOOP.md");
+  if (existsSync(file)) {
+    info(`${c.bold(r)} ${c.dim("(installed loop)")}`);
+    return {
+      fetched: { raw: readFileSync(file, "utf8"), url: file, owner: null, repo: null, subpath: null, slug: r, branch: null, local: true },
+    };
+  }
+  const { loops } = await loadRegistry();
+  const resolved = resolveSlug(loops, r);
+  if (!resolved)
+    throw new CliError(
+      `"${r}" isn't an installed loop or a directory slug. Use owner/repo, or install it first: agenticloops install ${r}`,
+      4,
+    );
+  info(`resolved ${c.bold(r)} -> ${c.bold(resolved)}`);
+  return { ref: resolved };
+}
 
 function pickBackend(harness, opts) {
   // harness=5dive -> host-optimized linked-task chain (distinct agents, task
@@ -22,7 +50,8 @@ function pickBackend(harness, opts) {
 }
 
 export async function runLoop(ref, opts = {}) {
-  const fetched = await fetchLoopMd(ref);
+  const src = await resolveRunSource(ref);
+  const fetched = src.fetched || (await fetchLoopMd(src.ref));
   const { manifest, prompt } = parseLoopMd(fetched.raw);
   const errs = validateManifest(manifest);
   if (errs.length) {

@@ -165,3 +165,21 @@ test("resolveSlug prefers source.repo, else core convention", () => {
   assert.equal(resolveSlug(loops, "ci-analyst"), "5dive-ai/loops/ci-analyst");
   assert.equal(resolveSlug(loops, "orphan"), null);
 });
+
+test("resolveRunSource: installed slug loads the local copy, refs pass through", async (t) => {
+  const { resolveRunSource } = await import("../src/runcmd.mjs");
+  const { recordPath, removeRecord } = await import("../src/schedule.mjs");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const KEY = "unit-resolve-run";
+  mkdirSync(recordPath(KEY), { recursive: true });
+  writeFileSync(join(recordPath(KEY), "LOOP.md"), "---\nname: unit-resolve-run\n---\nhi", "utf8");
+  t.after(() => removeRecord(KEY));
+
+  const installed = await resolveRunSource(KEY);
+  assert.ok(installed.fetched);
+  assert.equal(installed.fetched.slug, KEY);
+  assert.match(installed.fetched.raw, /unit-resolve-run/);
+
+  assert.deepEqual(await resolveRunSource("owner/repo"), { ref: "owner/repo" });
+  assert.deepEqual(await resolveRunSource("./LOOP.md"), { ref: "./LOOP.md" });
+});
