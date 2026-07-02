@@ -13,7 +13,8 @@ import { signRunReceipt } from "./receipt.mjs";
 import { acquireRunLock, DEFAULT_CONCURRENCY } from "./lock.mjs";
 import { loadRegistry, resolveSlug } from "./registry.mjs";
 import { recordPath } from "./schedule.mjs";
-import { c, info, ok, warn, fail, step, CliError } from "./util.mjs";
+import { c, sym, info, ok, warn, fail, step, CliError } from "./util.mjs";
+import { publisherLine } from "./signing.mjs";
 
 // A bare slug resolves the same way install's does: the locally installed copy
 // first (run exactly what was installed — works offline), then the public
@@ -58,6 +59,10 @@ export async function runLoop(ref, opts = {}) {
     errs.forEach((e) => fail(e));
     throw new CliError("LOOP.md failed validation", 3);
   }
+
+  // Verified-publisher line (a trust signal only, never a gate).
+  const pubLine = publisherLine(fetched.raw, { c, sym });
+  if (pubLine) process.stderr.write(pubLine + "\n");
 
   // Single-prompt loops run as a one-role chain so one engine handles both.
   const roles = isMultiAgent(manifest)

@@ -6,7 +6,7 @@ import { runLoop } from "../src/runcmd.mjs";
 import { loadRegistry, search } from "../src/registry.mjs";
 import { listRecords, parseSchedule } from "../src/schedule.mjs";
 import { fetchInstalls } from "../src/telemetry.mjs";
-import { c, sym, fail, info, CliError } from "../src/util.mjs";
+import { c, sym, fail, info, ok, CliError } from "../src/util.mjs";
 import { readFileSync } from "node:fs";
 
 // Single source of truth — the hardcoded copy here drifted (0.1.2 vs 0.3.0).
@@ -32,6 +32,8 @@ ${c.bold("Usage")}
   npx agenticloops find <query>
   npx agenticloops list
   npx agenticloops update [<slug>]
+  npx agenticloops sign <LOOP.md|dir>
+  npx agenticloops verify <owner/loop|path>
 
 ${c.bold("Commands")}
   install   Fetch + validate a LOOP.md, install its skills, pre-flight its
@@ -41,6 +43,10 @@ ${c.bold("Commands")}
   find      Search the public directory (agenticloops.dev) for loops.
   list      Show loops installed on this machine + their install counts.
   update    Re-fetch + re-install a loop (all, or one slug).
+  sign      Sign a LOOP.md you publish with this machine's ed25519 identity
+            (~/.openagent/agent.key) — optional; unsigned loops install fine.
+            Signed publishers get a "verified" mark on install/run + the site.
+  verify    Check a loop's publisher signature. Exit 0 verified/unsigned, 1 invalid.
 
 ${c.bold("Harnesses")}  5dive · github-actions · claude-code · cursor · cron
   Auto-detected from the current directory/env. A loop needs SCHEDULING, so a
@@ -155,6 +161,40 @@ async function cmdUpdate(positional, flags) {
   }
 }
 
+async function cmdSign(positional) {
+  const ref = positional[0];
+  if (!ref) throw new CliError("usage: agenticloops sign <LOOP.md|dir>", 2);
+  const { statSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { signLoopFile } = await import("../src/signing.mjs");
+  let file = ref;
+  if (existsSync(ref) && statSync(ref).isDirectory()) file = join(ref, "LOOP.md");
+  if (!existsSync(file)) throw new CliError(`no LOOP.md at ${file}`, 4);
+  const r = signLoopFile(file);
+  ok(`signed ${c.bold(file)}`);
+  info(`publisher: ${r.did}`);
+  info(c.dim("commit + push — installs will now show a verified-publisher line"));
+}
+
+async function cmdVerify(positional) {
+  const ref = positional[0];
+  if (!ref) throw new CliError("usage: agenticloops verify <owner/loop|path>", 2);
+  const { fetchLoopMd } = await import("../src/loop.mjs");
+  const { verifyLoopText } = await import("../src/signing.mjs");
+  const fetched = await fetchLoopMd(ref);
+  const v = verifyLoopText(fetched.raw);
+  if (!v.signed) {
+    info(`${c.bold(fetched.slug)} is unsigned ${c.dim("(fine — signing is an optional trust signal)")}`);
+    return;
+  }
+  if (v.ok) {
+    ok(`verified publisher ${c.bold(v.did)}`);
+    return;
+  }
+  fail(`publisher signature INVALID — ${v.reason}`);
+  process.exitCode = 1;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const { positional, flags } = parseArgs(argv);
@@ -184,6 +224,10 @@ async function main() {
     case "update":
     case "upgrade":
       return cmdUpdate(positional, flags);
+    case "sign":
+      return cmdSign(positional, flags);
+    case "verify":
+      return cmdVerify(positional, flags);
     default:
       throw new CliError(`unknown command "${cmd}". Run: agenticloops --help`, 2);
   }

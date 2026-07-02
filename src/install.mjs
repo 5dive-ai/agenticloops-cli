@@ -9,6 +9,7 @@ import { parseSchedule, registerTrigger, saveRecord } from "./schedule.mjs";
 import { pingInstall, telemetryDisabled } from "./telemetry.mjs";
 import { loadRegistry, resolveSlug } from "./registry.mjs";
 import { c, sym, info, ok, warn, fail, step, confirm, ask, CliError } from "./util.mjs";
+import { publisherLine } from "./signing.mjs";
 
 export async function install(ref, opts = {}) {
   const assumeYes = !!opts.yes;
@@ -41,6 +42,8 @@ export async function install(ref, opts = {}) {
   const trig = triggerOf(manifest);
   const multi = isMultiAgent(manifest);
   ok(`${c.bold(manifest.name)} — ${manifest.description?.split("\n")[0] ?? ""}`);
+  const pubLine = publisherLine(fetched.raw, { c, sym }); // signal only, never a gate
+  if (pubLine) process.stderr.write(pubLine + "\n");
   info(`trigger: ${trig.kind === "event" ? `on ${trig.value}` : trig.value}`);
   if (multi) info(`multi-agent: ${rolesOf(manifest).map((r) => r.role).join(" → ")} ${c.dim("(sequential chain)")}`);
 
