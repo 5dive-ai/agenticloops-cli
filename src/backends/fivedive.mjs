@@ -78,11 +78,15 @@ export function fivediveBackend(opts = {}) {
   const pollEveryMs = opts.pollEveryMs || 10000;
   const timeoutMs = opts.timeoutMs || 30 * 60 * 1000;
 
-  // Budget on the native handoff is ADVISORY: the woken agent self-moderates via
-  // the body note — there's no hard per-task cap until `5dive task add` carries one.
+  // Budget on this CLI's handoff is ADVISORY: it wakes the next role via `5dive
+  // task add`, which carries no budget flag, so the woken agent self-moderates
+  // against the body note. 5dive DOES hard-enforce per-loop token ceilings — but
+  // only on its own `task loop --ceiling` runner (halt + escalate via the heartbeat
+  // sweep, DIVE-972), not on these task-add handoffs. For a hard cap, run the loop
+  // natively with `5dive task loop --ceiling`.
   const budgetStatus = opts.budget ? "advisory" : null;
   const budgetNotice = opts.budget
-    ? `budget is advisory on the 5dive backend — the woken agent self-moderates; no hard per-task cap yet`
+    ? `budget is advisory on the 5dive backend — this CLI hands off via 'task add' (no budget flag), so the woken agent self-moderates. For a hard token ceiling, run it natively: '5dive task loop --ceiling' enforces host-side.`
     : null;
   return {
     label: "5dive (linked tasks · heartbeat wake · structured result)",
